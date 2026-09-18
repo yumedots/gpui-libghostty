@@ -118,9 +118,17 @@ fn write_theme_config(theme: &TerminalTheme) -> Result<tempfile::NamedTempFile, 
     Ok(file)
 }
 
+/// Holds the temporary theme file a surface was configured from so a later
+/// update can rebuild the same configuration with new colors.
+struct TerminalThemeState {
+    load_user_config: bool,
+    file: Option<tempfile::NamedTempFile>,
+}
+
 /// A GPUI entity backed by Ghostty's native Metal or Wayland/OpenGL surface.
 pub struct Terminal {
     surface: NativeSurface,
+    theme: TerminalThemeState,
     focus: FocusHandle,
     bounds: Bounds<Pixels>,
     tick_task: Option<Task<()>>,
@@ -195,6 +203,10 @@ impl Terminal {
             ];
             let mut terminal = Self {
                 surface,
+                theme: TerminalThemeState {
+                    load_user_config,
+                    file: theme_config,
+                },
                 focus,
                 bounds: Bounds::default(),
                 tick_task: None,
@@ -209,6 +221,24 @@ impl Terminal {
 
     pub fn is_alive(&self) -> bool {
         self.surface.is_alive()
+    }
+
+    /// Applies new colors to the running terminal without restarting its process.
+    ///
+    /// Ghostty re-derives its render state during the call, so the temporary theme
+    /// file is only kept alive until the next update replaces it.
+    pub fn update_theme(&mut self, theme: TerminalTheme) -> Result<(), String> {
+        let file = write_theme_config(&theme)?;
+        let path = CString::new(file.path().to_string_lossy().as_bytes())
+            .map_err(|_| "temporary Ghostty theme path contains a NUL byte".to_owned())?;
+        if !self
+            .surface
+            .update_theme(self.theme.load_user_config, Some(path.as_c_str()))
+        {
+            return Err("libghostty could not apply the terminal theme".to_owned());
+        }
+        self.theme.file = Some(file);
+        Ok(())
     }
 
     pub fn focus<T>(&mut self, window: &mut Window, cx: &mut Context<T>) {

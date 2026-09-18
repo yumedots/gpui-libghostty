@@ -32,6 +32,11 @@ unsafe extern "C" {
     fn gpui_ghostty_surface_linux_free(surface: *mut RawSurface);
     fn gpui_ghostty_surface_linux_tick(surface: *mut RawSurface);
     fn gpui_ghostty_surface_linux_is_alive(surface: *const RawSurface) -> bool;
+    fn gpui_ghostty_surface_linux_update_theme(
+        surface: *mut RawSurface,
+        load_user_config: bool,
+        theme_config_path: *const c_char,
+    ) -> bool;
     fn gpui_ghostty_surface_linux_snapshot(
         surface: *mut RawSurface,
         pixels: *mut *mut u8,
@@ -162,6 +167,26 @@ impl NativeSurface {
 
     pub fn is_alive(&self) -> bool {
         unsafe { gpui_ghostty_surface_linux_is_alive(self.raw.as_ptr()) }
+    }
+
+    /// Rebuilds the running surface's configuration from the given sources.
+    ///
+    /// Ghostty derives everything it needs before returning, so the theme file
+    /// may be removed once this call completes.
+    pub fn update_theme(
+        &mut self,
+        load_user_config: bool,
+        theme_config_path: Option<&CStr>,
+    ) -> bool {
+        // SAFETY: `raw` is uniquely owned, the optional path outlives the call, and
+        // the shim copies the derived configuration before it returns.
+        unsafe {
+            gpui_ghostty_surface_linux_update_theme(
+                self.raw.as_ptr(),
+                load_user_config,
+                theme_config_path.map_or(std::ptr::null(), CStr::as_ptr),
+            )
+        }
     }
 
     pub fn snapshot(&mut self) -> Result<NativeSnapshot, String> {

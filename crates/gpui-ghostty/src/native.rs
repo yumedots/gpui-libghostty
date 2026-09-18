@@ -240,6 +240,11 @@ mod platform {
         fn gpui_ghostty_surface_free(surface: *mut RawSurface);
         fn gpui_ghostty_surface_tick(surface: *mut RawSurface);
         fn gpui_ghostty_surface_is_alive(surface: *const RawSurface) -> bool;
+        fn gpui_ghostty_surface_update_theme(
+            surface: *mut RawSurface,
+            load_user_config: bool,
+            theme_config_path: *const c_char,
+        ) -> bool;
         fn gpui_ghostty_surface_snapshot(
             surface: *mut RawSurface,
             pixels: *mut *mut u8,
@@ -348,6 +353,26 @@ mod platform {
         pub fn is_alive(&self) -> bool {
             // SAFETY: `raw` remains valid for this value's lifetime.
             unsafe { gpui_ghostty_surface_is_alive(self.raw.as_ptr()) }
+        }
+
+        /// Rebuilds the running surface's configuration from the given sources.
+        ///
+        /// Ghostty derives everything it needs before returning, so the theme file
+        /// may be removed once this call completes.
+        pub fn update_theme(
+            &mut self,
+            load_user_config: bool,
+            theme_config_path: Option<&CStr>,
+        ) -> bool {
+            // SAFETY: `raw` is valid, the optional path outlives the call, and the
+            // shim copies the derived configuration before it returns.
+            unsafe {
+                gpui_ghostty_surface_update_theme(
+                    self.raw.as_ptr(),
+                    load_user_config,
+                    theme_config_path.map_or(std::ptr::null(), CStr::as_ptr),
+                )
+            }
         }
 
         pub fn snapshot(&mut self) -> Result<NativeSnapshot, String> {
@@ -514,6 +539,13 @@ impl NativeSurface {
     }
     pub fn tick(&mut self) {}
     pub fn is_alive(&self) -> bool {
+        false
+    }
+    pub fn update_theme(
+        &mut self,
+        _load_user_config: bool,
+        _theme_config_path: Option<&CStr>,
+    ) -> bool {
         false
     }
     pub fn snapshot(&mut self) -> Result<NativeSnapshot, String> {

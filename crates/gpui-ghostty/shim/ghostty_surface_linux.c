@@ -274,6 +274,27 @@ bool gpui_ghostty_surface_linux_is_alive(const gpui_ghostty_surface *state) {
         !ghostty_surface_process_exited(state->surface);
 }
 
+bool gpui_ghostty_surface_linux_update_theme(
+    gpui_ghostty_surface *state,
+    bool load_user_config,
+    const char *theme_config_path
+) {
+    if (state == NULL || state->surface == NULL) return false;
+    ghostty_config_t config = ghostty_config_new();
+    if (config == NULL) return false;
+    if (load_user_config) {
+        ghostty_config_load_default_files(config);
+        ghostty_config_load_recursive_files(config);
+    }
+    if (theme_config_path != NULL) {
+        ghostty_config_load_file(config, theme_config_path);
+    }
+    ghostty_config_finalize(config);
+    ghostty_surface_update_config(state->surface, config);
+    ghostty_config_free(config);
+    return true;
+}
+
 bool gpui_ghostty_surface_linux_snapshot(
     gpui_ghostty_surface *state,
     uint8_t **pixels,
