@@ -255,6 +255,12 @@ impl Terminal {
         self.surface.set_focus(self.visible && self.window_focused);
     }
 
+    /// Keeps the renderer running while this surface is hidden, so a caller that
+    /// presents a captured frame can read a current one back after a change.
+    pub fn set_hidden_rendering(&mut self, rendered: bool) {
+        self.surface.set_hidden_rendering(rendered);
+    }
+
     fn sync_focus(&mut self, window: &Window) {
         self.window_focused = self.focus.is_focused(window) && window.is_window_active();
         self.surface.set_focus(self.visible && self.window_focused);

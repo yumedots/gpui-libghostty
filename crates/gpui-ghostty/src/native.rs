@@ -261,6 +261,7 @@ mod platform {
             height: f64,
         );
         fn gpui_ghostty_surface_set_visible(surface: *mut RawSurface, visible: bool);
+        fn gpui_ghostty_surface_set_hidden_rendering(surface: *mut RawSurface, rendered: bool);
         fn gpui_ghostty_surface_set_focus(surface: *mut RawSurface, focused: bool);
         fn gpui_ghostty_surface_key(
             surface: *mut RawSurface,
@@ -425,6 +426,13 @@ mod platform {
             unsafe { gpui_ghostty_surface_set_focus(self.raw.as_ptr(), focused) }
         }
 
+        /// Keeps the renderer running while the surface's view is hidden, so a
+        /// caller that presents a captured frame can read a current one back.
+        pub fn set_hidden_rendering(&mut self, rendered: bool) {
+            // SAFETY: `raw` is valid and the value crosses the ABI by value.
+            unsafe { gpui_ghostty_surface_set_hidden_rendering(self.raw.as_ptr(), rendered) }
+        }
+
         pub fn key(
             &mut self,
             action: KeyAction,
@@ -553,6 +561,7 @@ impl NativeSurface {
     }
     pub fn set_frame(&mut self, _x: f64, _y: f64, _width: f64, _height: f64, _scale_factor: f64) {}
     pub fn set_visible(&mut self, _visible: bool) {}
+    pub fn set_hidden_rendering(&mut self, _rendered: bool) {}
     pub fn set_focus(&mut self, _focused: bool) {}
     pub fn key(
         &mut self,

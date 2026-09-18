@@ -32,6 +32,8 @@ typedef struct gpui_ghostty_surface {
     ghostty_clipboard_e clipboard_write_location;
     uint32_t width;
     uint32_t height;
+    bool visible;
+    bool hidden_rendering;
     _Atomic bool alive;
 } gpui_ghostty_surface;
 
@@ -417,8 +419,21 @@ void gpui_ghostty_surface_linux_set_size(
 
 void gpui_ghostty_surface_linux_set_visible(gpui_ghostty_surface *state, bool visible) {
     if (state == NULL || state->surface == NULL) return;
-    ghostty_surface_set_occlusion(state->surface, visible);
+    state->visible = visible;
+    ghostty_surface_set_occlusion(state->surface, visible || state->hidden_rendering);
     if (visible) ghostty_surface_refresh(state->surface);
+}
+
+// Keeps a hidden surface rendering so a caller that draws a captured frame can
+// read the current one back. Cleared when the surface is visible again.
+void gpui_ghostty_surface_linux_set_hidden_rendering(
+    gpui_ghostty_surface *state,
+    bool rendered
+) {
+    if (state == NULL || state->surface == NULL) return;
+    if (state->hidden_rendering == rendered) return;
+    state->hidden_rendering = rendered;
+    if (!state->visible) ghostty_surface_set_occlusion(state->surface, rendered);
 }
 
 void gpui_ghostty_surface_linux_set_focus(gpui_ghostty_surface *state, bool focused) {
