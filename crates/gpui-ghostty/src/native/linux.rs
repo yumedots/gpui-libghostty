@@ -32,6 +32,7 @@ unsafe extern "C" {
     fn gpui_ghostty_surface_linux_free(surface: *mut RawSurface);
     fn gpui_ghostty_surface_linux_tick(surface: *mut RawSurface);
     fn gpui_ghostty_surface_linux_is_alive(surface: *const RawSurface) -> bool;
+    fn gpui_ghostty_surface_linux_frame_count(surface: *mut RawSurface) -> u64;
     fn gpui_ghostty_surface_linux_update_theme(
         surface: *mut RawSurface,
         load_user_config: bool,
@@ -258,6 +259,12 @@ impl NativeSurface {
     /// caller that presents a captured frame can read a current one back.
     pub fn set_hidden_rendering(&mut self, rendered: bool) {
         unsafe { gpui_ghostty_surface_linux_set_hidden_rendering(self.raw.as_ptr(), rendered) }
+    }
+
+    /// Number of frames Ghostty has drawn for this surface.
+    pub fn frame_count(&mut self) -> u64 {
+        // SAFETY: `raw` is valid for the lifetime of the surface.
+        unsafe { gpui_ghostty_surface_linux_frame_count(self.raw.as_ptr()) }
     }
 
     pub fn key(

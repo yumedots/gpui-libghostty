@@ -32,6 +32,7 @@ typedef struct gpui_ghostty_surface {
     bool visible;
     bool hidden_rendering;
     _Atomic bool alive;
+    _Atomic uint64_t frame_count;
 } gpui_ghostty_surface;
 
 static void runtime_wakeup(void *userdata) {
@@ -44,6 +45,10 @@ static bool runtime_action(ghostty_app_t app, ghostty_target_s target, ghostty_a
     if (action.tag == GHOSTTY_ACTION_RENDER &&
         target.tag == GHOSTTY_TARGET_SURFACE &&
         target.target.surface != NULL) {
+        gpui_ghostty_surface *state = ghostty_surface_userdata(target.target.surface);
+        if (state != NULL) {
+            atomic_fetch_add_explicit(&state->frame_count, 1, memory_order_release);
+        }
         ghostty_surface_draw(target.target.surface);
         return true;
     }
@@ -213,6 +218,13 @@ bool gpui_ghostty_surface_is_alive(const gpui_ghostty_surface *state) {
         && !ghostty_surface_process_exited(state->surface);
 }
 
+// Counts the frames Ghostty has handed to this surface. A caller that applies a
+// new configuration can wait for the count to move instead of guessing a delay.
+uint64_t gpui_ghostty_surface_frame_count(gpui_ghostty_surface *state) {
+    if (state == NULL) return 0;
+    return atomic_load_explicit(&state->frame_count, memory_order_acquire);
+}
+
 bool gpui_ghostty_surface_update_theme(
     gpui_ghostty_surface *state,
     bool load_user_config,
@@ -231,6 +243,9 @@ bool gpui_ghostty_surface_update_theme(
     ghostty_config_finalize(config);
     ghostty_surface_update_config(state->surface, config);
     ghostty_config_free(config);
+    // Render the derived configuration now instead of waiting for the next
+    // wakeup, so the new colors reach the layer as soon as possible.
+    ghostty_surface_refresh(state->surface);
     return true;
 }
 

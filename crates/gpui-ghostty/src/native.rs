@@ -240,6 +240,7 @@ mod platform {
         fn gpui_ghostty_surface_free(surface: *mut RawSurface);
         fn gpui_ghostty_surface_tick(surface: *mut RawSurface);
         fn gpui_ghostty_surface_is_alive(surface: *const RawSurface) -> bool;
+        fn gpui_ghostty_surface_frame_count(surface: *mut RawSurface) -> u64;
         fn gpui_ghostty_surface_update_theme(
             surface: *mut RawSurface,
             load_user_config: bool,
@@ -433,6 +434,14 @@ mod platform {
             unsafe { gpui_ghostty_surface_set_hidden_rendering(self.raw.as_ptr(), rendered) }
         }
 
+        /// Number of frames Ghostty has drawn for this surface. It advances once
+        /// per rendered frame, so a caller can wait for a configuration change
+        /// to reach the screen without guessing a delay.
+        pub fn frame_count(&mut self) -> u64 {
+            // SAFETY: `raw` is valid for the lifetime of the surface.
+            unsafe { gpui_ghostty_surface_frame_count(self.raw.as_ptr()) }
+        }
+
         pub fn key(
             &mut self,
             action: KeyAction,
@@ -562,6 +571,9 @@ impl NativeSurface {
     pub fn set_frame(&mut self, _x: f64, _y: f64, _width: f64, _height: f64, _scale_factor: f64) {}
     pub fn set_visible(&mut self, _visible: bool) {}
     pub fn set_hidden_rendering(&mut self, _rendered: bool) {}
+    pub fn frame_count(&mut self) -> u64 {
+        0
+    }
     pub fn set_focus(&mut self, _focused: bool) {}
     pub fn key(
         &mut self,

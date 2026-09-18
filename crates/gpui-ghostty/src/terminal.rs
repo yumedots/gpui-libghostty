@@ -241,6 +241,13 @@ impl Terminal {
         Ok(())
     }
 
+    /// Number of frames Ghostty has drawn for this terminal. It advances once
+    /// per rendered frame, so a caller that applies a theme can wait for the
+    /// new colors to reach the screen instead of guessing a delay.
+    pub fn frame_count(&mut self) -> u64 {
+        self.surface.frame_count()
+    }
+
     pub fn focus<T>(&mut self, window: &mut Window, cx: &mut Context<T>) {
         self.set_visible(true);
         self.focus.focus(window, cx);
