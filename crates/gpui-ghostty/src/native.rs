@@ -233,6 +233,7 @@ mod platform {
             command: *const c_char,
             load_user_config: bool,
             theme_config_path: *const c_char,
+            quiet_login: bool,
             wakeup_userdata: *mut c_void,
             wakeup: unsafe extern "C" fn(*mut c_void),
             approve_clipboard: unsafe extern "C" fn(*mut c_void, i32, *const c_char) -> bool,
@@ -316,6 +317,7 @@ mod platform {
             command: CString,
             load_user_config: bool,
             theme_config_path: Option<&CStr>,
+            quiet_login: bool,
         ) -> Result<Self, &'static str> {
             let wakeup = NativeWakeup::new();
             // SAFETY: The C shim validates creation failures. The parent pointer and
@@ -327,6 +329,7 @@ mod platform {
                     command.as_ptr(),
                     load_user_config,
                     theme_config_path.map_or(std::ptr::null(), CStr::as_ptr),
+                    quiet_login,
                     wakeup.userdata(),
                     native_wakeup,
                     native_clipboard_approval,

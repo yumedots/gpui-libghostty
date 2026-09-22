@@ -121,6 +121,7 @@ impl NativeSurface {
         command: CString,
         load_user_config: bool,
         theme_config_path: Option<&CStr>,
+        quiet_login: bool,
     ) -> Result<Self, String> {
         let display = display.ok_or_else(|| "Wayland display handle is unavailable".to_owned())?;
         let wakeup = NativeWakeup::new();
@@ -139,6 +140,7 @@ impl NativeSurface {
                 command.as_ptr(),
                 load_user_config,
                 theme_config_path.map_or(std::ptr::null(), CStr::as_ptr),
+                quiet_login,
                 scale_factor,
                 wakeup.userdata(),
                 native_wakeup,
