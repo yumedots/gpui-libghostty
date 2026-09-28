@@ -34,10 +34,6 @@ Supports macOS and Linux with Wayland.
 - Zig 0.16
 - Neovim for `gpui-neovim`
 
-The default Nix development shell provides the Rust tools, Zig, Neovim, and
-the required Linux build and runtime libraries. macOS still requires Xcode
-command-line tools because the native build uses `xcrun`.
-
 On Ubuntu 24.04, install `libc++-21-dev` and `libc++abi-21-dev` from
 [LLVM's APT repository](https://apt.llvm.org/), plus `libxml2-dev` from Ubuntu.
 
