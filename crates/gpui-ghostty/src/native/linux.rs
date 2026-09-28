@@ -24,6 +24,7 @@ unsafe extern "C" {
         command: *const c_char,
         load_user_config: bool,
         theme_config_path: *const c_char,
+        quiet_login: bool,
         scale_factor: f64,
         wakeup_userdata: *mut c_void,
         wakeup: unsafe extern "C" fn(*mut c_void),
