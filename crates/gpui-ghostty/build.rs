@@ -323,10 +323,6 @@ impl NativeTools {
     fn command(&self, program: impl AsRef<OsStr>) -> Command {
         let mut command = Command::new(program);
         command
-            .env_remove("NIX_CFLAGS_COMPILE")
-            .env_remove("NIX_LDFLAGS")
-            .env_remove("NIX_CC")
-            .env_remove("NIX_BINTOOLS")
             .env("DEVELOPER_DIR", &self.developer_dir)
             .env("SDKROOT", &self.sdk_root);
         command
