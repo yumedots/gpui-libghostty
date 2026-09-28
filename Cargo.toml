@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/gpui-ghostty", "crates/gpui-neovim"]
+members = ["crates/gpui-ghostty"]
 
 [workspace.package]
 version = "0.1.7"

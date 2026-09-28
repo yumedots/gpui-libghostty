@@ -1,28 +1,20 @@
 # gpui-libghostty
 
-Native Ghostty terminal and embedded Neovim components for GPUI.
-
-## Demo
-
-Embedded Neovim editing this project's README with completion:
-
-https://github.com/user-attachments/assets/140e3552-1074-4994-b91d-d0966fe623c9
+Native Ghostty terminal component for GPUI.
 
 ## Status
 Project status is alpha, expect bugs and instability.
 
 ## Crates
 
-Published on crates.io: [gpui-libghostty](https://crates.io/crates/gpui-libghostty)
-and [gpui-neovim](https://crates.io/crates/gpui-neovim). Add either to your project:
+Published on crates.io: [gpui-libghostty](https://crates.io/crates/gpui-libghostty).
+Add it to your project:
 
 ```sh
 cargo add gpui-libghostty
-cargo add gpui-neovim
 ```
 
 - `gpui-libghostty` embeds a native Ghostty terminal in GPUI.
-- `gpui-neovim` embeds Neovim in GPUI.
 
 Supports macOS and Linux with Wayland.
 
@@ -32,13 +24,11 @@ Supports macOS and Linux with Wayland.
 - macOS and Xcode command-line tools, or Wayland with EGL, libc++ 21 or newer,
   libxml2, and desktop OpenGL 4.3
 - Zig 0.16
-- Neovim for `gpui-neovim`
 
 On Ubuntu 24.04, install `libc++-21-dev` and `libc++abi-21-dev` from
 [LLVM's APT repository](https://apt.llvm.org/), plus `libxml2-dev` from Ubuntu.
 
-Set `ZIG` to select a non-default Zig executable. Set `GPUI_NVIM` or assign
-`NvimOptions::executable` to select Neovim.
+Set `ZIG` to select a non-default Zig executable.
 
 ## Terminal
 
@@ -101,33 +91,6 @@ options.clipboard_approval = Some(Arc::new(|request| {
     request.operation == ClipboardOperation::Write
 }));
 ```
-
-`NvimOptions::clipboard_approval` exposes the same policy for embedded Neovim.
-
-## Neovim
-
-```rust,ignore
-use gpui_neovim::{NvimEditor, NvimOptions};
-
-let editor = NvimEditor::spawn(
-    NvimOptions::new(project_directory, initial_file),
-    window,
-    cx,
-)?;
-let editor = cx.new(|_| editor);
-```
-
-Call and await `NvimEditor::open_file` through the entity to reuse the running
-Neovim instance.
-
-Run the standalone example from this repository:
-
-```sh
-cargo run -p gpui-neovim --example neovim -- README.md
-```
-
-The optional argument is a file or directory. The example uses your Neovim
-configuration; install `nvim` on `PATH` or set `GPUI_NVIM` to its executable.
 
 ## Checks
 
