@@ -10,8 +10,8 @@ use std::{
 use gpui::{
     AppContext as _, Bounds, ClipboardItem, Context, Entity, FocusHandle, InteractiveElement as _,
     IntoElement, KeyDownEvent, KeyUpEvent, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
-    ParentElement as _, Pixels, Render, RenderImage, ScrollDelta, ScrollWheelEvent, Styled as _,
-    Subscription, Task, Window, canvas, div,
+    ParentElement as _, Pixels, Render, RenderImage, Rgba, ScrollDelta, ScrollWheelEvent,
+    Styled as _, Subscription, Task, Window, canvas, div,
 };
 use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 
@@ -353,15 +353,35 @@ impl Terminal {
         }
     }
 
-    fn update_frame(&mut self, bounds: Bounds<Pixels>, scale_factor: f64) {
-        self.bounds = bounds;
-        self.surface.set_frame(
+    pub fn overlay_preview(&self, bounds: Bounds<Pixels>, color: Rgba) {
+        self.surface.overlay_preview(
             f64::from(f32::from(bounds.origin.x)),
             f64::from(f32::from(bounds.origin.y)),
             f64::from(f32::from(bounds.size.width)),
             f64::from(f32::from(bounds.size.height)),
-            scale_factor,
+            u32::from(color),
         );
+    }
+
+    pub fn overlay_pill(&self, bounds: Bounds<Pixels>, background: Rgba, border: Rgba, dot: Rgba) {
+        self.surface.overlay_pill(
+            f64::from(f32::from(bounds.origin.x)),
+            f64::from(f32::from(bounds.origin.y)),
+            f64::from(f32::from(bounds.size.width)),
+            f64::from(f32::from(bounds.size.height)),
+            u32::from(background),
+            u32::from(border),
+            u32::from(dot),
+        );
+    }
+
+    fn update_frame(&mut self, bounds: Bounds<Pixels>, scale_factor: f64) {
+        self.bounds = bounds;
+        let x = f64::from(f32::from(bounds.origin.x));
+        let y = f64::from(f32::from(bounds.origin.y));
+        let width = f64::from(f32::from(bounds.size.width));
+        let height = f64::from(f32::from(bounds.size.height));
+        self.surface.set_frame(x, y, width, height, scale_factor);
     }
 
     fn key_down(&mut self, event: &KeyDownEvent) {

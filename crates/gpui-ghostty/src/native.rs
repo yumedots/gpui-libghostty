@@ -293,10 +293,29 @@ mod platform {
             y: f64,
             modifiers: c_int,
         );
+        fn gpui_ghostty_overlay_preview(
+            parent_view: *mut c_void,
+            x: f64,
+            y: f64,
+            width: f64,
+            height: f64,
+            rgba: u32,
+        );
+        fn gpui_ghostty_overlay_pill(
+            parent_view: *mut c_void,
+            x: f64,
+            y: f64,
+            width: f64,
+            height: f64,
+            background: u32,
+            border: u32,
+            dot: u32,
+        );
     }
 
     pub struct NativeSurface {
         raw: NonNull<RawSurface>,
+        parent: NonNull<c_void>,
         wakeup: NativeWakeup,
         state: NativeSurfaceState,
         _working_directory: CString,
@@ -338,6 +357,7 @@ mod platform {
             let raw = NonNull::new(raw).ok_or("libghostty could not create a terminal surface")?;
             Ok(Self {
                 raw,
+                parent: parent_view,
                 wakeup,
                 state: NativeSurfaceState::default(),
                 _working_directory: working_directory,
@@ -517,6 +537,36 @@ mod platform {
             // SAFETY: Values cross the adapter ABI by value.
             unsafe { gpui_ghostty_surface_mouse_scroll(self.raw.as_ptr(), x, y, scroll_flags) }
         }
+
+        pub fn overlay_preview(&self, x: f64, y: f64, width: f64, height: f64, rgba: u32) {
+            // SAFETY: `parent` outlives this surface and calls stay on the main thread.
+            unsafe { gpui_ghostty_overlay_preview(self.parent.as_ptr(), x, y, width, height, rgba) }
+        }
+
+        pub fn overlay_pill(
+            &self,
+            x: f64,
+            y: f64,
+            width: f64,
+            height: f64,
+            background: u32,
+            border: u32,
+            dot: u32,
+        ) {
+            // SAFETY: `parent` outlives this surface and calls stay on the main thread.
+            unsafe {
+                gpui_ghostty_overlay_pill(
+                    self.parent.as_ptr(),
+                    x,
+                    y,
+                    width,
+                    height,
+                    background,
+                    border,
+                    dot,
+                )
+            }
+        }
     }
 
     impl Drop for NativeSurface {
@@ -599,6 +649,18 @@ impl NativeSurface {
     ) {
     }
     pub fn mouse_scroll(&mut self, _x: f64, _y: f64, _precision: bool) {}
+    pub fn overlay_preview(&self, _x: f64, _y: f64, _width: f64, _height: f64, _rgba: u32) {}
+    pub fn overlay_pill(
+        &self,
+        _x: f64,
+        _y: f64,
+        _width: f64,
+        _height: f64,
+        _background: u32,
+        _border: u32,
+        _dot: u32,
+    ) {
+    }
     pub fn take_clipboard_read(&mut self) -> Option<ClipboardRead> {
         None
     }

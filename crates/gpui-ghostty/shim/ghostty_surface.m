@@ -1,6 +1,8 @@
 #import <AppKit/AppKit.h>
 #import <CoreVideo/CoreVideo.h>
 #import <IOSurface/IOSurface.h>
+#import <QuartzCore/QuartzCore.h>
+#import <objc/runtime.h>
 #import <stdatomic.h>
 #import <stdlib.h>
 #import <string.h>
@@ -15,6 +17,199 @@
     return nil;
 }
 @end
+
+static char gpui_ghostty_overlay_key;
+
+@interface GpuiGhosttyOverlayView : NSView
+@property (nonatomic, assign) CALayer *preview_layer;
+@property (nonatomic, assign) CALayer *pill_layer;
+@property (nonatomic, assign) uint32_t preview_color;
+@property (nonatomic, assign) uint32_t pill_background;
+@property (nonatomic, assign) uint32_t pill_border;
+@property (nonatomic, assign) uint32_t pill_dot;
+@end
+
+@implementation GpuiGhosttyOverlayView
+- (NSView *)hitTest:(NSPoint)point {
+    (void)point;
+    return nil;
+}
+@end
+
+static NSColor *gpui_ghostty_overlay_color(uint32_t rgba) {
+    CGFloat red = ((rgba >> 24) & 0xff) / 255.0;
+    CGFloat green = ((rgba >> 16) & 0xff) / 255.0;
+    CGFloat blue = ((rgba >> 8) & 0xff) / 255.0;
+    CGFloat alpha = (rgba & 0xff) / 255.0;
+    return [NSColor colorWithSRGBRed:red green:green blue:blue alpha:alpha];
+}
+
+static void gpui_ghostty_overlay_hide_preview(GpuiGhosttyOverlayView *overlay) {
+    if (overlay == nil || overlay.preview_layer.hidden) return;
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    overlay.preview_layer.hidden = YES;
+    overlay.preview_color = 0;
+    [CATransaction commit];
+}
+
+static void gpui_ghostty_overlay_hide_pill(GpuiGhosttyOverlayView *overlay) {
+    if (overlay == nil || overlay.pill_layer.hidden) return;
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    overlay.pill_layer.hidden = YES;
+    overlay.pill_background = 0;
+    overlay.pill_border = 0;
+    overlay.pill_dot = 0;
+    [CATransaction commit];
+}
+
+static void gpui_ghostty_overlay_hide(GpuiGhosttyOverlayView *overlay) {
+    gpui_ghostty_overlay_hide_preview(overlay);
+    gpui_ghostty_overlay_hide_pill(overlay);
+}
+
+static void gpui_ghostty_overlay_layout_pill(GpuiGhosttyOverlayView *overlay, NSRect frame) {
+    overlay.pill_layer.frame = frame;
+    CGFloat width = NSWidth(frame);
+    CGFloat height = NSHeight(frame);
+    NSArray<CALayer *> *dots = overlay.pill_layer.sublayers;
+    for (NSUInteger index = 0; index < dots.count; index++) {
+        CGFloat center = width / 2.0 + ((CGFloat)index - 1.0) * 7.0;
+        dots[index].frame = NSMakeRect(center - 2.0, height / 2.0 - 2.0, 4.0, 4.0);
+    }
+}
+
+static void gpui_ghostty_overlay_paint_pill_colors(GpuiGhosttyOverlayView *overlay) {
+    overlay.pill_layer.backgroundColor = gpui_ghostty_overlay_color(overlay.pill_background).CGColor;
+    overlay.pill_layer.borderColor = gpui_ghostty_overlay_color(overlay.pill_border).CGColor;
+    NSColor *dot = gpui_ghostty_overlay_color(overlay.pill_dot);
+    for (CALayer *layer in overlay.pill_layer.sublayers) {
+        layer.backgroundColor = dot.CGColor;
+    }
+}
+
+static GpuiGhosttyOverlayView *gpui_ghostty_overlay_front(NSView *parent) {
+    if (parent == nil) return nil;
+    GpuiGhosttyOverlayView *overlay = objc_getAssociatedObject(parent, &gpui_ghostty_overlay_key);
+    BOOL fresh = overlay == nil;
+    if (fresh) {
+        overlay = [[GpuiGhosttyOverlayView alloc]
+            initWithFrame:NSMakeRect(0, 0, NSWidth(parent.bounds), NSHeight(parent.bounds))];
+        overlay.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+        overlay.wantsLayer = YES;
+        overlay.layer = [CALayer layer];
+        CALayer *preview = [CALayer layer];
+        preview.hidden = YES;
+        [overlay.layer addSublayer:preview];
+        overlay.preview_layer = preview;
+        CALayer *pill = [CALayer layer];
+        pill.hidden = YES;
+        pill.cornerRadius = 5.0;
+        pill.borderWidth = 1.0;
+        pill.masksToBounds = YES;
+        [overlay.layer addSublayer:pill];
+        for (NSUInteger index = 0; index < 3; index++) {
+            CALayer *dot = [CALayer layer];
+            dot.cornerRadius = 2.0;
+            [pill addSublayer:dot];
+        }
+        overlay.pill_layer = pill;
+    }
+    [parent addSubview:overlay positioned:NSWindowAbove relativeTo:nil];
+    if (fresh) {
+        objc_setAssociatedObject(
+            parent, &gpui_ghostty_overlay_key, overlay, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [overlay release];
+    }
+    return overlay;
+}
+
+static GpuiGhosttyOverlayView *gpui_ghostty_overlay_for(NSView *parent) {
+    if (parent == nil) return nil;
+    return objc_getAssociatedObject(parent, &gpui_ghostty_overlay_key);
+}
+
+void gpui_ghostty_overlay_preview(
+    void *parent_view,
+    double x,
+    double y,
+    double width,
+    double height,
+    uint32_t rgba
+) {
+    NSView *parent = (NSView *)parent_view;
+    GpuiGhosttyOverlayView *overlay = gpui_ghostty_overlay_front(parent);
+    if (overlay == nil) return;
+    if (width <= 0.0 || height <= 0.0) {
+        gpui_ghostty_overlay_hide_preview(overlay);
+        return;
+    }
+    NSRect frame = NSMakeRect(x, NSHeight(overlay.bounds) - y - height, width, height);
+    BOOL hidden = overlay.preview_layer.hidden;
+    BOOL moved = !CGRectEqualToRect(overlay.preview_layer.frame, frame);
+    BOOL recolored = overlay.preview_color != rgba;
+    if (!hidden && !moved && !recolored) return;
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    if (hidden) {
+        overlay.preview_layer.frame = frame;
+        overlay.preview_layer.backgroundColor = gpui_ghostty_overlay_color(rgba).CGColor;
+        overlay.preview_color = rgba;
+        overlay.preview_layer.hidden = NO;
+    } else {
+        if (moved) overlay.preview_layer.frame = frame;
+        if (recolored) {
+            overlay.preview_layer.backgroundColor = gpui_ghostty_overlay_color(rgba).CGColor;
+            overlay.preview_color = rgba;
+        }
+    }
+    [CATransaction commit];
+}
+
+void gpui_ghostty_overlay_pill(
+    void *parent_view,
+    double x,
+    double y,
+    double width,
+    double height,
+    uint32_t background,
+    uint32_t border,
+    uint32_t dot
+) {
+    NSView *parent = (NSView *)parent_view;
+    GpuiGhosttyOverlayView *overlay = gpui_ghostty_overlay_front(parent);
+    if (overlay == nil) return;
+    if (width <= 0.0 || height <= 0.0) {
+        gpui_ghostty_overlay_hide_pill(overlay);
+        return;
+    }
+    NSRect frame = NSMakeRect(x, NSHeight(overlay.bounds) - y - height, width, height);
+    BOOL hidden = overlay.pill_layer.hidden;
+    BOOL moved = !CGRectEqualToRect(overlay.pill_layer.frame, frame);
+    BOOL recolored = overlay.pill_background != background || overlay.pill_border != border
+        || overlay.pill_dot != dot;
+    if (!hidden && !moved && !recolored) return;
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    if (hidden) {
+        gpui_ghostty_overlay_layout_pill(overlay, frame);
+        overlay.pill_background = background;
+        overlay.pill_border = border;
+        overlay.pill_dot = dot;
+        gpui_ghostty_overlay_paint_pill_colors(overlay);
+        overlay.pill_layer.hidden = NO;
+    } else {
+        if (moved) gpui_ghostty_overlay_layout_pill(overlay, frame);
+        if (recolored) {
+            overlay.pill_background = background;
+            overlay.pill_border = border;
+            overlay.pill_dot = dot;
+            gpui_ghostty_overlay_paint_pill_colors(overlay);
+        }
+    }
+    [CATransaction commit];
+}
 
 typedef void (*gpui_ghostty_wakeup_cb)(void *userdata);
 // Adapter operation values: paste=0, read=1, write=2.
@@ -141,6 +336,7 @@ gpui_ghostty_surface *gpui_ghostty_surface_new(
     state->view = [[GpuiGhosttyView alloc] initWithFrame:NSMakeRect(0, 0, 800, 600)];
     [state->view setHidden:YES];
     [state->parent addSubview:state->view];
+    gpui_ghostty_overlay_front(state->parent);
 
     state->config = ghostty_config_new();
     if (state->config == NULL) goto fail;
@@ -204,6 +400,7 @@ fail:
 
 void gpui_ghostty_surface_free(gpui_ghostty_surface *state) {
     if (state == NULL) return;
+    gpui_ghostty_overlay_hide(gpui_ghostty_overlay_for(state->parent));
     [state->view removeFromSuperview];
     if (state->surface != NULL) ghostty_surface_free(state->surface);
     if (state->app != NULL) ghostty_app_free(state->app);
@@ -308,14 +505,13 @@ void gpui_ghostty_surface_snapshot_free(uint8_t *pixels) {
     free(pixels);
 }
 
-void gpui_ghostty_surface_set_frame(
+static void gpui_ghostty_apply_frame(
     gpui_ghostty_surface *state,
     double x,
     double y,
     double width,
     double height
 ) {
-    if (state == NULL || state->surface == NULL) return;
     double parent_height = NSHeight(state->parent.bounds);
     [state->view setFrame:NSMakeRect(x, parent_height - y - height, width, height)];
     double scale = state->parent.window.backingScaleFactor ?: NSScreen.mainScreen.backingScaleFactor;
@@ -324,10 +520,23 @@ void gpui_ghostty_surface_set_frame(
     ghostty_surface_refresh(state->surface);
 }
 
+void gpui_ghostty_surface_set_frame(
+    gpui_ghostty_surface *state,
+    double x,
+    double y,
+    double width,
+    double height
+) {
+    if (state == NULL || state->surface == NULL) return;
+    state->view.layer.contentsGravity = kCAGravityTopLeft;
+    gpui_ghostty_apply_frame(state, x, y, width, height);
+}
+
 void gpui_ghostty_surface_set_visible(gpui_ghostty_surface *state, bool visible) {
     if (state == NULL || state->surface == NULL) return;
     state->visible = visible;
     [state->view setHidden:!visible];
+    if (!visible) gpui_ghostty_overlay_hide(gpui_ghostty_overlay_for(state->parent));
     ghostty_surface_set_occlusion(state->surface, visible || state->hidden_rendering);
     if (visible) ghostty_surface_refresh(state->surface);
 }

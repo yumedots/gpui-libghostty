@@ -321,6 +321,20 @@ impl NativeSurface {
         }
     }
 
+    pub fn overlay_preview(&self, _x: f64, _y: f64, _width: f64, _height: f64, _rgba: u32) {}
+
+    pub fn overlay_pill(
+        &self,
+        _x: f64,
+        _y: f64,
+        _width: f64,
+        _height: f64,
+        _background: u32,
+        _border: u32,
+        _dot: u32,
+    ) {
+    }
+
     pub fn take_clipboard_read(&mut self) -> Option<ClipboardRead> {
         let mut selection = false;
         let request = unsafe {
