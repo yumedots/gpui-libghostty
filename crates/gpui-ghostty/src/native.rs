@@ -293,6 +293,15 @@ mod platform {
             y: f64,
             modifiers: c_int,
         );
+        fn gpui_ghostty_surface_take_clipboard_read(
+            surface: *mut RawSurface,
+            selection: *mut bool,
+        ) -> *mut c_void;
+        fn gpui_ghostty_surface_complete_clipboard_read(
+            surface: *mut RawSurface,
+            request: *mut c_void,
+            text: *const c_char,
+        );
         fn gpui_ghostty_overlay_preview(
             parent_view: *mut c_void,
             x: f64,
@@ -521,10 +530,25 @@ mod platform {
         }
 
         pub fn take_clipboard_read(&mut self) -> Option<ClipboardRead> {
-            None
+            let mut selection = false;
+            let request = unsafe {
+                gpui_ghostty_surface_take_clipboard_read(self.raw.as_ptr(), &mut selection)
+            };
+            Some(ClipboardRead {
+                selection,
+                request: NonNull::new(request)?,
+            })
         }
 
-        pub fn complete_clipboard_read(&mut self, _request: ClipboardRead, _text: &CStr) {}
+        pub fn complete_clipboard_read(&mut self, request: ClipboardRead, text: &CStr) {
+            unsafe {
+                gpui_ghostty_surface_complete_clipboard_read(
+                    self.raw.as_ptr(),
+                    request.request.as_ptr(),
+                    text.as_ptr(),
+                )
+            }
+        }
 
         pub fn take_clipboard_write(&mut self) -> Option<ClipboardWrite> {
             None

@@ -16,6 +16,7 @@ use gpui::{
 use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 
 use crate::clipboard::ClipboardApprovalCallback;
+use crate::image_paste;
 use crate::native::{KeyAction, Modifiers, MouseButton, MouseState, NativeSurface};
 
 /// An opaque terminal color without an alpha channel.
@@ -331,7 +332,10 @@ impl Terminal {
             } else {
                 cx.read_from_clipboard()
             };
-            let mut text = item.and_then(|item| item.text()).unwrap_or_default();
+            let mut text = item
+                .as_ref()
+                .map(image_paste::paste_text)
+                .unwrap_or_default();
             if text.contains('\0') {
                 text = text.replace('\0', "�");
             }

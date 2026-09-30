@@ -4,6 +4,7 @@
 //! Wayland subsurface backed by its OpenGL renderer on Linux.
 
 mod clipboard;
+mod image_paste;
 mod native;
 mod terminal;
 

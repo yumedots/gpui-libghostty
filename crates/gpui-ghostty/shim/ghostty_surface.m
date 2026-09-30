@@ -224,6 +224,8 @@ typedef struct gpui_ghostty_surface {
     void *wakeup_userdata;
     gpui_ghostty_wakeup_cb wakeup;
     gpui_ghostty_approve_clipboard_cb approve_clipboard;
+    void *clipboard_request;
+    ghostty_clipboard_e clipboard_location;
     bool visible;
     bool hidden_rendering;
     _Atomic bool alive;
@@ -251,12 +253,11 @@ static bool runtime_action(ghostty_app_t app, ghostty_target_s target, ghostty_a
 }
 
 static bool runtime_read_clipboard(void *userdata, ghostty_clipboard_e location, void *request) {
-    (void)location;
     gpui_ghostty_surface *state = userdata;
-    if (state->surface == NULL) return false;
-    NSString *text = [[NSPasteboard generalPasteboard] stringForType:NSPasteboardTypeString];
-    if (text == nil) return false;
-    ghostty_surface_complete_clipboard_request(state->surface, text.UTF8String, request, false);
+    if (state->surface == NULL || state->clipboard_request != NULL) return false;
+    state->clipboard_request = request;
+    state->clipboard_location = location;
+    runtime_wakeup(state);
     return true;
 }
 
@@ -620,5 +621,25 @@ void gpui_ghostty_surface_mouse_scroll(
 ) {
     if (state != NULL && state->surface != NULL) {
         ghostty_surface_mouse_scroll(state->surface, x, y, modifiers);
+    }
+}
+
+void *gpui_ghostty_surface_take_clipboard_read(gpui_ghostty_surface *state, bool *selection) {
+    if (state == NULL || state->clipboard_request == NULL) return NULL;
+    void *request = state->clipboard_request;
+    state->clipboard_request = NULL;
+    if (selection != NULL) {
+        *selection = state->clipboard_location == GHOSTTY_CLIPBOARD_SELECTION;
+    }
+    return request;
+}
+
+void gpui_ghostty_surface_complete_clipboard_read(
+    gpui_ghostty_surface *state,
+    void *request,
+    const char *text
+) {
+    if (state != NULL && state->surface != NULL && request != NULL && text != NULL) {
+        ghostty_surface_complete_clipboard_request(state->surface, text, request, false);
     }
 }
