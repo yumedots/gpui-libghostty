@@ -404,6 +404,14 @@ impl Terminal {
     }
 
     fn send_key(&mut self, action: KeyAction, keystroke: &gpui::Keystroke) {
+        if shifted_enter_breaks_line(keystroke) {
+            if matches!(action, KeyAction::Press | KeyAction::Repeat)
+                && let Ok(text) = CString::new("\n")
+            {
+                self.surface.text(&text);
+            }
+            return;
+        }
         let Some(key) = native_key(&keystroke.key) else {
             if matches!(action, KeyAction::Press | KeyAction::Repeat)
                 && !keystroke.modifiers.control
@@ -604,6 +612,14 @@ fn key_modifiers(
         consumed.insert(Modifiers::SHIFT);
     }
     (active, consumed)
+}
+
+fn shifted_enter_breaks_line(keystroke: &gpui::Keystroke) -> bool {
+    keystroke.key == "enter"
+        && keystroke.modifiers.shift
+        && !keystroke.modifiers.control
+        && !keystroke.modifiers.alt
+        && !keystroke.modifiers.platform
 }
 
 struct NativeKey {
@@ -849,6 +865,10 @@ fn native_keycode(key: &str) -> Option<u32> {
 fn native_keycode(_: &str) -> Option<u32> {
     None
 }
+
+#[cfg(test)]
+#[path = "terminal_tests.rs"]
+mod terminal_tests;
 
 #[cfg(test)]
 mod tests {
