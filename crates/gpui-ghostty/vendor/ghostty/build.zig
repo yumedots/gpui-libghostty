@@ -211,6 +211,7 @@ pub fn build(b: *std.Build) !void {
             lib_static.install("ghostty-internal-static.lib");
         } else if (config.target.result.os.tag.isDarwin()) {
             lib_static.install("libghostty-internal.a");
+            resources.install();
         } else {
             lib_static.install("ghostty-internal.a");
         }

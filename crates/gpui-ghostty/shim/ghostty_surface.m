@@ -2,6 +2,8 @@
 #import <CoreVideo/CoreVideo.h>
 #import <IOSurface/IOSurface.h>
 #import <QuartzCore/QuartzCore.h>
+#import <limits.h>
+#import <mach-o/dyld.h>
 #import <objc/runtime.h>
 #import <stdatomic.h>
 #import <stdlib.h>
@@ -322,6 +324,13 @@ gpui_ghostty_surface *gpui_ghostty_surface_new(
     static int init_result = -1;
     dispatch_once(&once, ^{
         setenv("GHOSTTY_LOG", "stderr", 0);
+        char executable_path[PATH_MAX];
+        uint32_t executable_path_size = sizeof(executable_path);
+        if (_NSGetExecutablePath(executable_path, &executable_path_size) == 0 &&
+            strstr(executable_path, ".app/Contents/") == NULL &&
+            access(GHOSTTY_RESOURCES_DIR_PATH, F_OK) == 0) {
+            setenv("GHOSTTY_RESOURCES_DIR", GHOSTTY_RESOURCES_DIR_PATH, 0);
+        }
         init_result = ghostty_init(0, NULL);
     });
     if (init_result != GHOSTTY_SUCCESS || parent_view == NULL ||

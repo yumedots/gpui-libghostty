@@ -76,7 +76,8 @@ fn main() {
     }
     install_cached_library(&library, &out_dir);
 
-    compile_shim(&manifest, &source, &out_dir, &tools);
+    let resources_dir = stage_resources(&prefix, &out_dir);
+    compile_shim(&manifest, &source, &out_dir, &tools, &resources_dir);
 
     println!("cargo:rustc-link-lib=static=ghostty-internal");
     println!("cargo:rustc-link-lib=c++");
@@ -244,7 +245,13 @@ fn linux_native_fingerprint(source: &Path, zig: &OsStr) -> String {
     format!("{:032x}", hash.finish())
 }
 
-fn compile_shim(manifest: &Path, source: &Path, out_dir: &Path, tools: &NativeTools) {
+fn compile_shim(
+    manifest: &Path,
+    source: &Path,
+    out_dir: &Path,
+    tools: &NativeTools,
+    resources_dir: &Path,
+) {
     let object = out_dir.join("ghostty_surface.o");
     let library = out_dir.join("libgpui_ghostty_surface.a");
     let status = tools
@@ -267,6 +274,10 @@ fn compile_shim(manifest: &Path, source: &Path, out_dir: &Path, tools: &NativeTo
             "-o",
             object.to_str().expect("UTF-8 shim object path"),
         ])
+        .arg(format!(
+            "-DGHOSTTY_RESOURCES_DIR_PATH=\"{}\"",
+            resources_dir.display()
+        ))
         .status()
         .expect("compile libghostty Objective-C shim");
     assert!(status.success(), "libghostty Objective-C shim failed");
@@ -621,6 +632,10 @@ fn copy_tree(source: &Path, destination: &Path) {
             copy_tree(&source_path, &destination_path);
         } else if file_type.is_file() {
             std::fs::copy(&source_path, &destination_path).expect("copy Ghostty source file");
+        } else if file_type.is_symlink() {
+            let target = std::fs::read_link(&source_path).expect("read Ghostty source symlink");
+            std::os::unix::fs::symlink(&target, &destination_path)
+                .expect("copy Ghostty source symlink");
         } else {
             panic!(
                 "unsupported entry in vendored Ghostty source: {}",
@@ -628,6 +643,22 @@ fn copy_tree(source: &Path, destination: &Path) {
             );
         }
     }
+}
+
+fn stage_resources(prefix: &Path, out_dir: &Path) -> PathBuf {
+    let target_root = out_dir
+        .ancestors()
+        .nth(4)
+        .expect("Cargo target directory from build output path");
+    let staged = target_root.join("ghostty-resources");
+    let source = prefix.join("share");
+    if source.is_dir() {
+        if staged.exists() {
+            std::fs::remove_dir_all(&staged).expect("remove stale staged Ghostty resources");
+        }
+        copy_tree(&source, &staged.join("share"));
+    }
+    staged.join("share/ghostty")
 }
 
 fn command_output(program: &str, args: &[&str], removed: &[&str]) -> String {
